@@ -20,7 +20,7 @@ static std::vector<int64_t> generate_random_latency(int n, int64_t max_value) {
 }
 
 static void BM_hdr_cpp_record_values(benchmark::State &state) {
-  const int N = 10000;
+  const int N = state.range(0);
   auto latency = generate_random_latency(N, 360000);
 
   hdrcpp::HdrHistogram<1, 360000, 2> h;
@@ -33,7 +33,7 @@ static void BM_hdr_cpp_record_values(benchmark::State &state) {
 }
 
 static void BM_hdr_c_record_values(benchmark::State &state) {
-  const int N = 10000;
+  const int N = state.range(0);
   auto latency = generate_random_latency(N, 360000);
 
   struct hdr_histogram *h;
@@ -47,6 +47,6 @@ static void BM_hdr_c_record_values(benchmark::State &state) {
 }
 
 // Register the functions as a benchmark
-BENCHMARK(BM_hdr_cpp_record_values);
-BENCHMARK(BM_hdr_c_record_values);
+BENCHMARK(BM_hdr_cpp_record_values)->RangeMultiplier(10)->Range(1000, 100000);
+BENCHMARK(BM_hdr_c_record_values)->RangeMultiplier(10)->Range(1000, 100000);
 BENCHMARK_MAIN();
