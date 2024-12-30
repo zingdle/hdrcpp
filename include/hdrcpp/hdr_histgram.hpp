@@ -88,11 +88,10 @@ struct HdrHistogram {
 
   static_assert(unit_magnitude + sub_bucket_half_count_magnitude <= 61);
 
-  static constexpr auto buckets_needed_to_cover_value = [](int64_t value, int32_t sub_bucket_count,
-                                                           int32_t unit_magnitude) -> int32_t {
+  static constexpr auto buckets_needed_to_cover_value = []() -> int32_t {
     int64_t smallest_untrackable_value = (static_cast<int64_t>(sub_bucket_count)) << unit_magnitude;
     int32_t buckets_needed = 1;
-    while (smallest_untrackable_value <= value) {
+    while (smallest_untrackable_value <= highest_trackable_value) {
       if (smallest_untrackable_value > INT64_MAX / 2) {
         return buckets_needed + 1;
       }
@@ -103,8 +102,7 @@ struct HdrHistogram {
     return buckets_needed;
   };
 
-  static constexpr int32_t bucket_count =
-      buckets_needed_to_cover_value(highest_trackable_value, sub_bucket_count, static_cast<int32_t>(unit_magnitude));
+  static constexpr int32_t bucket_count = buckets_needed_to_cover_value();
   static constexpr int32_t counts_len = (bucket_count + 1) * (sub_bucket_count / 2);
 
   static int32_t get_bucket_index(int64_t value) {
