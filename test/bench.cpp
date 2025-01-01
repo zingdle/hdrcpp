@@ -39,6 +39,13 @@ static void BM_hdr_cpp_init(benchmark::State &state) {
   }
 }
 
+static void BM_hdr_cpp_new_init(benchmark::State &state) {
+  for (auto _ : state) {
+    benchmark::DoNotOptimize(new hdrcpp::HdrHistogram<1, 360000, 2>());
+    benchmark::ClobberMemory();
+  }
+}
+
 static void BM_hdr_c_init(benchmark::State &state) {
   for (auto _ : state) {
     struct hdr_histogram *histogram;
@@ -115,6 +122,7 @@ static void BM_hdr_c_value_at_percentile(benchmark::State &state) {
 
 // Register the functions as a benchmark
 BENCHMARK(BM_hdr_cpp_init);
+BENCHMARK(BM_hdr_cpp_new_init);
 BENCHMARK(BM_hdr_c_init);
 BENCHMARK(BM_hdr_cpp_record_values)->RangeMultiplier(10)->Range(1000, 100000);
 BENCHMARK(BM_hdr_c_record_values)->RangeMultiplier(10)->Range(1000, 100000);
