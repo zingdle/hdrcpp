@@ -187,6 +187,16 @@ struct HdrHistogram {
   }
 
   int64_t value_at_percentile(double percentile) {
+    auto get_value_from_idx_up_to_count = [this](int64_t count_at_percentile) -> int64_t {
+      int64_t count_to_idx = 0;
+      count_at_percentile = 0 < count_at_percentile ? count_at_percentile : 1;
+      for (int32_t idx = 0; idx < counts_len; idx++) {
+        count_to_idx += counts[idx];
+        if (count_to_idx >= count_at_percentile) return value_at_index(idx);
+      }
+      return 0;
+    };
+
     double requested_percentile = percentile < 100.0 ? percentile : 100.0;
     int64_t count_at_percentile = static_cast<int64_t>(((requested_percentile / 100) * total_count) + 0.5);
     int64_t value_from_idx = get_value_from_idx_up_to_count(count_at_percentile);
@@ -196,18 +206,30 @@ struct HdrHistogram {
     return highest_equivalent_value(value_from_idx);
   }
 
-  int64_t get_value_from_idx_up_to_count(int64_t count_at_percentile) {
-    int64_t count_to_idx = 0;
+  template <typename... Ts>
+  auto value_at_percentiles(Ts... percentiles) {
+    constexpr size_t N = sizeof...(Ts);
+    auto construct_impl = [total_count = total_count](double percentile) {
+      const double requested_percentile = percentile < 100.0 ? percentile : 100.0;
+      const int64_t count_at_percentile = static_cast<int64_t>(((requested_percentile / 100) * total_count) + 0.5);
+      return count_at_percentile > 1 ? count_at_percentile : 1;
+    };
+    std::array<int64_t, N> values{construct_impl(percentiles)...};
 
-    count_at_percentile = 0 < count_at_percentile ? count_at_percentile : 1;
-    for (int32_t idx = 0; idx < counts_len; idx++) {
-      count_to_idx += counts[idx];
-      if (count_to_idx >= count_at_percentile) {
-        return value_at_index(idx);
+    size_t at_pos = 0;
+    int64_t total = 0;
+    int32_t counts_index = 0;
+    while (counts_index < counts_len && at_pos < N) {
+      total += counts[counts_index];
+      int64_t value = value_at_index(counts_index);
+      counts_index++;
+
+      while (at_pos < N && total >= values[at_pos]) {
+        values[at_pos] = highest_equivalent_value(value);
+        at_pos++;
       }
     }
-
-    return 0;
+    return values;
   }
 };
 

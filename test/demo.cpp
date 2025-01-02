@@ -31,4 +31,7 @@ int main() {
   fmt::print("P75: {}\n", h.value_at_percentile(75));
   fmt::print("P90: {}\n", h.value_at_percentile(90));
   fmt::print("P99: {}\n", h.value_at_percentile(99));
+
+  auto percentiles = h.value_at_percentiles(50, 75, 90, 99);
+  fmt::print("P50/P75/P90/P99: {} {} {} {}\n", percentiles[0], percentiles[1], percentiles[2], percentiles[3]);
 }

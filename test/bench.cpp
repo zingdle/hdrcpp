@@ -4,6 +4,9 @@
 #include <hdrcpp/hdr_histgram.hpp>
 #include <random>
 
+// https://github.com/HdrHistogram/HdrHistogram_c/pull/90
+// https://github.com/HdrHistogram/hdrhistogram-go/pull/48
+
 static std::vector<int64_t> generate_random_latency(int n, int64_t max_value) {
   std::random_device rd;
   std::mt19937 gen(rd());
@@ -59,6 +62,7 @@ static void BM_hdr_cpp_record_values(benchmark::State &state) {
   auto latency = generate_random_latency(N, 360000);
 
   hdrcpp::HdrHistogram<1, 360000, 2> h;
+
   for (auto _ : state) {
     for (int i = 0; i < N; i++) {
       benchmark::DoNotOptimize(h.record_values(latency[i]));
@@ -73,6 +77,7 @@ static void BM_hdr_c_record_values(benchmark::State &state) {
 
   struct hdr_histogram *h;
   hdr_init(1, 360000, 2, &h);
+
   for (auto _ : state) {
     for (int i = 0; i < N; i++) {
       benchmark::DoNotOptimize(hdr_record_value(h, latency[i]));
@@ -87,10 +92,9 @@ static void BM_hdr_cpp_value_at_percentile(benchmark::State &state) {
   auto percentile = generate_random_percentile(N);
 
   hdrcpp::HdrHistogram<1, 360000, 2> h;
-
-  for (int i = 0; i < N; i++) {
+  for (int i = 0; i < N; i++) 
     h.record_values(latency[i]);
-  }
+  
 
   for (auto _ : state) {
     for (int i = 0; i < N; i++) {
@@ -107,7 +111,6 @@ static void BM_hdr_c_value_at_percentile(benchmark::State &state) {
 
   struct hdr_histogram *h;
   hdr_init(1, 360000, 2, &h);
-
   for (int i = 0; i < N; i++) {
     hdr_record_value(h, latency[i]);
   }
@@ -115,6 +118,89 @@ static void BM_hdr_c_value_at_percentile(benchmark::State &state) {
   for (auto _ : state) {
     for (int i = 0; i < N; i++) {
       benchmark::DoNotOptimize(hdr_value_at_percentile(h, percentile[i]));
+      benchmark::ClobberMemory();
+    }
+  }
+}
+
+static void BM_hdr_cpp_value_at_percentile_given_array(benchmark::State &state) {
+  const int N = state.range(0);
+  auto latency = generate_random_latency(N, 360000);
+  auto percentile = generate_random_percentile(N);
+
+  hdrcpp::HdrHistogram<1, 360000, 2> h;
+  for (int i = 0; i < N; i++) {
+    h.record_values(latency[i]);
+  }
+
+  const double percentile_list[4] = {50.0, 95.0, 99.0, 99.9};
+  for (auto _ : state) {
+    for (int i = 0; i < N; i++) {
+      for (auto p : percentile_list) {
+        benchmark::DoNotOptimize(h.value_at_percentile(p));
+        benchmark::ClobberMemory();
+      }
+    }
+  }
+}
+
+static void BM_hdr_c_value_at_percentile_given_array(benchmark::State &state) {
+  const int N = state.range(0);
+  auto latency = generate_random_latency(N, 360000);
+  auto percentile = generate_random_percentile(N);
+
+  struct hdr_histogram *h;
+  hdr_init(1, 360000, 2, &h);
+  for (int i = 0; i < N; i++) {
+    hdr_record_value(h, latency[i]);
+  }
+
+  const double percentile_list[4] = {50.0, 95.0, 99.0, 99.9};
+  int64_t values[4] = {0, 0, 0, 0};
+  for (auto _ : state) {
+    for (int i = 0; i < N; i++) {
+      for (auto p : percentile_list) {
+        benchmark::DoNotOptimize(hdr_value_at_percentile(h, p));
+        benchmark::ClobberMemory();
+      }
+    }
+  }
+}
+
+static void BM_hdr_cpp_value_at_percentiles_given_array(benchmark::State &state) {
+  const int N = state.range(0);
+  auto latency = generate_random_latency(N, 360000);
+  auto percentile = generate_random_percentile(N);
+
+  hdrcpp::HdrHistogram<1, 360000, 2> h;
+  for (int i = 0; i < N; i++) {
+    h.record_values(latency[i]);
+  }
+
+  for (auto _ : state) {
+    for (int i = 0; i < N; i++) {
+      benchmark::DoNotOptimize(h.value_at_percentiles(50, 95, 99, 99.9));
+      benchmark::ClobberMemory();
+    }
+  }
+}
+
+static void BM_hdr_c_value_at_percentiles_given_array(benchmark::State &state) {
+  const int N = state.range(0);
+  auto latency = generate_random_latency(N, 360000);
+  auto percentile = generate_random_percentile(N);
+
+  struct hdr_histogram *h;
+  hdr_init(1, 360000, 2, &h);
+  for (int i = 0; i < N; i++) {
+    hdr_record_value(h, latency[i]);
+  }
+
+  const double percentile_list[4] = {50.0, 95.0, 99.0, 99.9};
+  int64_t values[4] = {0, 0, 0, 0};
+  for (auto _ : state) {
+    for (int i = 0; i < N; i++) {
+      benchmark::DoNotOptimize(hdr_value_at_percentiles(h, percentile_list, values, 4));
       benchmark::ClobberMemory();
     }
   }
@@ -128,4 +214,8 @@ BENCHMARK(BM_hdr_cpp_record_values)->RangeMultiplier(10)->Range(1000, 100000);
 BENCHMARK(BM_hdr_c_record_values)->RangeMultiplier(10)->Range(1000, 100000);
 BENCHMARK(BM_hdr_cpp_value_at_percentile)->RangeMultiplier(10)->Range(1000, 100000);
 BENCHMARK(BM_hdr_c_value_at_percentile)->RangeMultiplier(10)->Range(1000, 100000);
+BENCHMARK(BM_hdr_cpp_value_at_percentile_given_array)->RangeMultiplier(10)->Range(1000, 100000);
+BENCHMARK(BM_hdr_c_value_at_percentiles_given_array)->RangeMultiplier(10)->Range(1000, 100000);
+BENCHMARK(BM_hdr_cpp_value_at_percentile_given_array)->RangeMultiplier(10)->Range(1000, 100000);
+BENCHMARK(BM_hdr_c_value_at_percentiles_given_array)->RangeMultiplier(10)->Range(1000, 100000);
 BENCHMARK_MAIN();
